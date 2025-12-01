@@ -17,6 +17,7 @@ export default function PhotoEditor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEnhanced, setIsEnhanced] = useState(false);
   const [sliderPosition, setSliderPosition] = useState(50);
+  const [showManualSettings, setShowManualSettings] = useState(false);
   const [settings, setSettings] = useState<EnhancementSettings>({
     brightness: 110,
     contrast: 120,
@@ -60,8 +61,21 @@ export default function PhotoEditor() {
       setSelectedImage(e.target?.result as string);
       setIsEnhanced(false);
       setSliderPosition(50);
+      setShowManualSettings(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const applyAutoEnhancement = () => {
+    setSettings({
+      brightness: 112,
+      contrast: 125,
+      sharpness: 145,
+      clarity: 155,
+    });
+    setTimeout(() => {
+      applyEnhancements();
+    }, 100);
   };
 
   const applyEnhancements = () => {
@@ -344,11 +358,22 @@ export default function PhotoEditor() {
             </div>
 
             <Card className="p-8 rounded-2xl">
-              <h3 className="text-xl font-semibold text-[#222222] mb-6">
-                Настройки улучшения
-              </h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-[#222222]">
+                  Настройки улучшения
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowManualSettings(!showManualSettings)}
+                  className="text-sm text-gray-600 hover:text-[#0EA5E9]"
+                >
+                  {showManualSettings ? 'Скрыть настройки' : 'Ручные настройки'}
+                </Button>
+              </div>
               
-              <div className="space-y-6">
+              {showManualSettings && (
+              <div className="space-y-6 mb-6">
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -421,26 +446,41 @@ export default function PhotoEditor() {
                   />
                 </div>
               </div>
+              )}
 
-              <div className="flex gap-4 mt-8">
+              <div className="flex gap-4">
                 {!isEnhanced ? (
-                  <Button
-                    onClick={applyEnhancements}
-                    disabled={isProcessing}
-                    className="flex-1 bg-[#0EA5E9] hover:bg-[#0284C7] text-white py-6 text-lg rounded-xl"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
-                        Обработка...
-                      </>
-                    ) : (
-                      <>
-                        <Icon name="Wand2" size={20} className="mr-2" />
-                        Улучшить фото
-                      </>
+                  <>
+                    <Button
+                      onClick={applyAutoEnhancement}
+                      disabled={isProcessing}
+                      className="flex-1 bg-[#0EA5E9] hover:bg-[#0284C7] text-white py-6 text-lg rounded-xl"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                          Обработка...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="Wand2" size={20} className="mr-2" />
+                          Улучшить автоматически
+                        </>
+                      )}
+                    </Button>
+                    
+                    {showManualSettings && (
+                      <Button
+                        onClick={applyEnhancements}
+                        disabled={isProcessing}
+                        variant="outline"
+                        className="flex-1 border-2 py-6 text-lg rounded-xl"
+                      >
+                        <Icon name="Settings" size={20} className="mr-2" />
+                        Применить настройки
+                      </Button>
                     )}
-                  </Button>
+                  </>
                 ) : (
                   <>
                     <Button
