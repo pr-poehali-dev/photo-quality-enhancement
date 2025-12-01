@@ -68,10 +68,10 @@ export default function PhotoEditor() {
 
   const applyAutoEnhancement = () => {
     setSettings({
-      brightness: 112,
-      contrast: 125,
-      sharpness: 145,
-      clarity: 155,
+      brightness: 115,
+      contrast: 130,
+      sharpness: 160,
+      clarity: 175,
     });
     setTimeout(() => {
       applyEnhancements();
@@ -93,18 +93,22 @@ export default function PhotoEditor() {
       canvas.width = img.width;
       canvas.height = img.height;
       
-      ctx.filter = `brightness(${settings.brightness}%) contrast(${settings.contrast}%) saturate(110%)`;
+      ctx.filter = `brightness(${settings.brightness}%) contrast(${settings.contrast}%) saturate(115%)`;
       ctx.drawImage(img, 0, 0);
       
       let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       
+      imageData = applyNoiseReduction(imageData);
+      
       if (settings.sharpness > 100) {
-        imageData = applySharpen(imageData, (settings.sharpness - 100) / 100);
+        imageData = applySharpen(imageData, (settings.sharpness - 100) / 80);
       }
       
       if (settings.clarity > 100) {
-        imageData = applyClarity(imageData, (settings.clarity - 100) / 100);
+        imageData = applyClarity(imageData, (settings.clarity - 100) / 80);
       }
+      
+      imageData = applyDetailEnhancement(imageData);
       
       ctx.putImageData(imageData, 0, 0);
 
@@ -161,7 +165,7 @@ export default function PhotoEditor() {
       -1, -1, -1
     ];
     
-    const kernelWeight = amount * 0.3;
+    const kernelWeight = amount * 0.4;
 
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
@@ -178,6 +182,92 @@ export default function PhotoEditor() {
           const originalValue = data[outIdx];
           const enhanced = originalValue + sum;
           output.data[outIdx] = Math.max(0, Math.min(255, enhanced));
+        }
+        output.data[(y * width + x) * 4 + 3] = 255;
+      }
+    }
+    
+    for (let i = 0; i < data.length; i += 4) {
+      if (i < width * 4 || i >= (height - 1) * width * 4 || 
+          (i / 4) % width === 0 || (i / 4) % width === width - 1) {
+        output.data[i] = data[i];
+        output.data[i + 1] = data[i + 1];
+        output.data[i + 2] = data[i + 2];
+        output.data[i + 3] = data[i + 3];
+      }
+    }
+    
+    return output;
+  };
+
+  const applyNoiseReduction = (imageData: ImageData): ImageData => {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const output = new ImageData(width, height);
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0;
+          let count = 0;
+          
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+              sum += data[idx];
+              count++;
+            }
+          }
+          
+          const outIdx = (y * width + x) * 4 + c;
+          const avg = sum / count;
+          const current = data[outIdx];
+          output.data[outIdx] = current * 0.7 + avg * 0.3;
+        }
+        output.data[(y * width + x) * 4 + 3] = 255;
+      }
+    }
+    
+    for (let i = 0; i < data.length; i += 4) {
+      if (i < width * 4 || i >= (height - 1) * width * 4 || 
+          (i / 4) % width === 0 || (i / 4) % width === width - 1) {
+        output.data[i] = data[i];
+        output.data[i + 1] = data[i + 1];
+        output.data[i + 2] = data[i + 2];
+        output.data[i + 3] = data[i + 3];
+      }
+    }
+    
+    return output;
+  };
+
+  const applyDetailEnhancement = (imageData: ImageData): ImageData => {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const output = new ImageData(width, height);
+    
+    const edgeKernel = [
+      0, -1, 0,
+      -1, 5, -1,
+      0, -1, 0
+    ];
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0;
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+              const kidx = (ky + 1) * 3 + (kx + 1);
+              sum += data[idx] * edgeKernel[kidx];
+            }
+          }
+          const outIdx = (y * width + x) * 4 + c;
+          const enhanced = sum * 0.15;
+          output.data[outIdx] = Math.max(0, Math.min(255, data[outIdx] + enhanced));
         }
         output.data[(y * width + x) * 4 + 3] = 255;
       }
