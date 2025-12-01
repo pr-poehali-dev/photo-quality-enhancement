@@ -8,6 +8,7 @@ interface EnhancementSettings {
   brightness: number;
   contrast: number;
   sharpness: number;
+  clarity: number;
 }
 
 export default function PhotoEditor() {
@@ -20,6 +21,7 @@ export default function PhotoEditor() {
     brightness: 110,
     contrast: 120,
     sharpness: 130,
+    clarity: 140,
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,11 +82,17 @@ export default function PhotoEditor() {
       ctx.filter = `brightness(${settings.brightness}%) contrast(${settings.contrast}%) saturate(110%)`;
       ctx.drawImage(img, 0, 0);
       
+      let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
       if (settings.sharpness > 100) {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const sharpened = applySharpen(imageData, (settings.sharpness - 100) / 100);
-        ctx.putImageData(sharpened, 0, 0);
+        imageData = applySharpen(imageData, (settings.sharpness - 100) / 100);
       }
+      
+      if (settings.clarity > 100) {
+        imageData = applyClarity(imageData, (settings.clarity - 100) / 100);
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
 
       setTimeout(() => {
         setIsProcessing(false);
@@ -101,9 +109,9 @@ export default function PhotoEditor() {
     const output = new ImageData(width, height);
     
     const kernel = [
-      0, -amount, 0,
-      -amount, 1 + 4 * amount, -amount,
-      0, -amount, 0
+      0, -amount * 0.5, 0,
+      -amount * 0.5, 1 + 4 * amount * 0.5, -amount * 0.5,
+      0, -amount * 0.5, 0
     ];
 
     for (let y = 1; y < height - 1; y++) {
@@ -121,6 +129,53 @@ export default function PhotoEditor() {
           output.data[outIdx] = Math.max(0, Math.min(255, sum));
         }
         output.data[(y * width + x) * 4 + 3] = 255;
+      }
+    }
+    
+    return output;
+  };
+
+  const applyClarity = (imageData: ImageData, amount: number): ImageData => {
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+    const output = new ImageData(width, height);
+    
+    const kernel = [
+      -1, -1, -1,
+      -1,  9, -1,
+      -1, -1, -1
+    ];
+    
+    const kernelWeight = amount * 0.3;
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        for (let c = 0; c < 3; c++) {
+          let sum = 0;
+          for (let ky = -1; ky <= 1; ky++) {
+            for (let kx = -1; kx <= 1; kx++) {
+              const idx = ((y + ky) * width + (x + kx)) * 4 + c;
+              const kidx = (ky + 1) * 3 + (kx + 1);
+              sum += data[idx] * kernel[kidx] * kernelWeight;
+            }
+          }
+          const outIdx = (y * width + x) * 4 + c;
+          const originalValue = data[outIdx];
+          const enhanced = originalValue + sum;
+          output.data[outIdx] = Math.max(0, Math.min(255, enhanced));
+        }
+        output.data[(y * width + x) * 4 + 3] = 255;
+      }
+    }
+    
+    for (let i = 0; i < data.length; i += 4) {
+      if (i < width * 4 || i >= (height - 1) * width * 4 || 
+          (i / 4) % width === 0 || (i / 4) % width === width - 1) {
+        output.data[i] = data[i];
+        output.data[i + 1] = data[i + 1];
+        output.data[i + 2] = data[i + 2];
+        output.data[i + 3] = data[i + 3];
       }
     }
     
@@ -341,6 +396,24 @@ export default function PhotoEditor() {
                   <Slider
                     value={[settings.sharpness]}
                     onValueChange={([value]) => setSettings({ ...settings, sharpness: value })}
+                    min={100}
+                    max={200}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <Icon name="Sparkles" size={18} />
+                      Четкость
+                    </label>
+                    <span className="text-sm font-medium text-[#0EA5E9]">{settings.clarity}%</span>
+                  </div>
+                  <Slider
+                    value={[settings.clarity]}
+                    onValueChange={([value]) => setSettings({ ...settings, clarity: value })}
                     min={100}
                     max={200}
                     step={1}
